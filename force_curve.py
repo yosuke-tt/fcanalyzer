@@ -6,5 +6,5 @@ from force_curve_abc import ForceCurveAbstract
 from dataclasses import dataclass
 
 @dataclass
-class ForceCurve(ForceCurveAbstract):
+class ForceVolumeCurve(ForceCurveAbstract):
     pass

@@ -25,14 +25,15 @@ def get_cp_under_th(deflection,
     return cp, coeff_baseline_1d 
 
 def get_contact_point(fc:ForceVolumeCurve,
-                        cp_fc_type:str=None,
+                        cp_fc_type:str="u_th",
                         cp_func_args:list|tuple=(),
                         cp_func_kargs:dict={}):
+    cp_func_dict = {"u_th":get_cp_under_th}
+    cp_func = cp_func_dict[cp_fc_type]
 
-    # cp_func_dict = {"":}
-    # cp_func = cp_func_dict[cp_fc_type]
+    
     for i ,deflection in enumerate(fc.deflection):
-        cp, baseline_coeff = get_cp_under_th(deflection[:len(deflection)//2],
+        cp, baseline_coeff = cp_func(deflection[:len(deflection)//2],
                                  *cp_func_args,
                                     **cp_func_kargs)
 
@@ -60,4 +61,6 @@ if __name__=="__main__":
                     xstep = config.loc["Xstep"],
                     ystep = config.loc["Ystep"])
     get_contact_point(fc)
+
+
 # %%

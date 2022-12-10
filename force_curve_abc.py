@@ -9,10 +9,10 @@ from afm import AFM
 #%%
 
 @dataclass
-class ForceCurveAbstract(ABCMeta = ABCMeta):
+class ForceCurveAbstract(metaclass = ABCMeta):
     
     afm:AFM
-
+    
     deflection:np.ndarray[object]
     zsensor:np.ndarray[object]
     
@@ -20,13 +20,13 @@ class ForceCurveAbstract(ABCMeta = ABCMeta):
     ystep:int
     
     cp:np.ndarray[int]=None
-
+    
     force:np.ndarray[float]=None
     indentation:np.ndarray[float]=None    
-
+    
     xstep_length:float = None
     ystep_length:float = None
-
+    
     zig:bool = None
 
     def __post_init__(self):

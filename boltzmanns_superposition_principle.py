@@ -13,10 +13,11 @@ from properties import *
 def boltz_mann_superposition_principle(t,
                                         delta_dev:callable,
                                         property_func:callable = et_e0,
+                                        start_t=0
                                         ):
-    def _integral_inner(t):
-        return delta_dev(t)*property_func(t)
-    return integrate.quad(_integral_inner, 0, t)[0]
+    def _integral_inner(g):
+        return delta_dev(g)*property_func(t-g)
+    return integrate.quad(_integral_inner, start_t, t)[0]
 
 
 warnings.simplefilter('ignore') 

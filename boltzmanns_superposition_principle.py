@@ -1,8 +1,14 @@
+import warnings
+
+
 import numpy as np
 from scipy import integrate
+from scipy import stats
+from scipy.special import beta
 
 
 from properties import *
+
 
 def boltz_mann_superposition_principle(t,
                                         delta_dev:callable,
@@ -10,7 +16,7 @@ def boltz_mann_superposition_principle(t,
                                         ):
     def _integral_inner(t):
         return delta_dev(t)*property_func(t)
-    return integrate.quad(_integral_inner, 0, t)
+    return integrate.quad(_integral_inner, 0, t)[0]
 
 
 warnings.simplefilter('ignore') 

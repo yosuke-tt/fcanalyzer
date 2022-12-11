@@ -1,4 +1,5 @@
 
+#%%
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -11,7 +12,7 @@ from scipy.optimize import newton
 
 from properties import hertz_constant
 from afm import AFM 
-from properties import et_e0
+from properties import et_e0, et_e1
 from boltzmanns_superposition_principle import boltz_mann_superposition_principle
 
 #%%
@@ -59,133 +60,199 @@ def ting(time, e0, einf, alpha,
     return np.hstack([force_app, force_ret])
 
 #%%
-if __name__ == "__main__":
-    fc = np.loadtxt("D:/tsuboyama/AFM3/data_20221204/data_192156/ForceCurve/ForceCurve_025.lvm")
-    deflection = fc[:len(fc)//2]
-    zsensor = fc[len(fc)//2:]
 
+zsensor = np.load("./zsensor.npy")
+deflection = np.load("./deflection.npy")
+# plt.plot(deflection)
+cp = np.where(deflection[:len(deflection)//2]<0.02)[0][-1]
+# plt.scatter(cp, deflection[cp])
+deflection-=deflection[cp]
+# plt.plot()
+diff_maxidx = np.argmax(zsensor)-np.argmax(deflection)
 
-    app_point_sp_z = np.argmax(zsensor)
-    app_point_sp_def = np.argmax(deflection)
-    diff_app_point = app_point_sp_z-app_point_sp_def
+ret_cp = np.argmax(zsensor)+np.where(zsensor[np.argmax(zsensor):]<zsensor[cp])[0][0]
+# plt.plot(zsensor[cp-diff_maxidx:ret_cp-diff_maxidx])
+# plt.plot(deflection[cp:ret_cp])
+zsensor = zsensor[cp+diff_maxidx:ret_cp+diff_maxidx]-zsensor[cp+diff_maxidx]
+deflection = deflection[cp:ret_cp]-deflection[cp]
 
-    print(app_point_sp_z,app_point_sp_def,diff_app_point)
-    app_point = 5000
-    ret_point = 3000
+force      = deflection*30*0.1*1e-9
+indentation = (zsensor-zsensor[0])*25e-6-deflection*300*1e-9
+# indentation = np.hstack([np.arange(1000),np.arange(1000,0,-1)])*1e-9
+ind_positive = indentation>0
+indentation = indentation[ind_positive]
+force =force[ind_positive]
+# force = force[ind_positive]
 
-    x_fit  = np.hstack([
-                np.arange(app_point),
-                np.arange(len(deflection)-ret_point,len(deflection))
-            ])
-    y_fit  = np.hstack([
-                deflection[:app_point],
-                deflection[-ret_point:]
-            ])
+time = np.arange(0,len(indentation))*3e-6
 
-    deflection_func = np.poly1d(np.polyfit(x_fit,y_fit, deg=2))
-    deflection_base = deflection - deflection_func(np.arange(len(deflection))) 
+indentation_fit = np.polyfit(time, indentation, deg=30)
+indentation_func = np.poly1d(indentation_fit)
+indentation_dev_func = indentation_func.deriv()
+indentation_23_dev_func = lambda t:3*indentation_dev_func(t)*indentation_func(t)**(1/2)/2    
 
-    ret_cp = np.where(zsensor[app_point_sp_z:]<zsensor[diff_app_point+5700])[0][0]
+tp_idx = np.where(indentation_dev_func(time)>0)[0][-1]
+tm = brenth(indentation_dev_func,
+            0,
+            time[-1],xtol=2.2e-22, rtol=8.881784197001252e-13)
 
+afm = AFM(radius=5e-6,invols=30, k=0.1,no_afm=3)
 
-    force_base = deflection_base[5700:app_point_sp_def+ret_cp]-deflection_base[5700]
-    force      = force_base*300*0.1*1e-9
-    # plt.plot(force)
-
-    indentation = (zsensor[diff_app_point+5700:app_point_sp_z+ret_cp]-zsensor[diff_app_point+5700])*25e-6-force_base*300*1e-9
-    ind_positive = indentation>0
-    indentation = indentation[ind_positive]
-    force = force[ind_positive]
-
-
-    #%%
-
-    indentation = np.arange(1000)*1e-9
-    indentation = np.hstack([indentation,indentation[::-1]])
-    plt.plot(indentation)
-    #%%
-    time = np.arange(0,len(indentation))*3e-6
-
-
-
-    indentation_23_fit = np.polyfit(time, indentation**(3/2), deg=3)
-    indentation_23_func = np.poly1d(indentation_23_fit)
-    indentation_23_dev_func = indentation_23_func.deriv()
-
-    from scipy.interpolate import UnivariateSpline
-    spl = UnivariateSpline(time, indentation, k=3)
-
-    indentation_fit = np.polyfit(time, indentation, deg=3)
-    indentation_func = np.poly1d(indentation_fit)
-    indentation_dev_func = indentation_func.deriv()
-
-
-
-    plt.plot(time, indentation)
-    plt.plot(time, indentation_func(time))
-    # plt.plot(time, spl(time))
+hc = hertz_constant(afm)
+#%%
+def boltz_mann_superposition_principle(t,
+                                    delta_dev:callable,
+                                    property_func:callable = et_e1,
+                                    start_t=0
+                                    ):
+    if start_t==t:
+        return 0
+    def _integral_inner(g):
+        return delta_dev(g)*property_func(t-g)
+    # fig,ax = plt.subplots(2,1)
+    # ax[0].set_title("ret "+ str(t)+ "  "+str(start_t))
+    # ax[0].plot(np.linspace(start_t ,t, 100),[delta_dev(g) for  g in np.linspace(start_t ,t, 100)])
+    # ax[1].plot(np.linspace(start_t ,t, 100),[property_func(t-g) for  g in np.linspace(start_t ,t,100)])
     # plt.show()
-    # indentation_func = spl.derivative()
-    # indentation_dev_func = spl.derivative()
-    # plt.plot(time, spl.derivative(2)(time))
-    plt.show()
-    plt.close()
-    plt.plot(time, indentation_dev_func.deriv()(time))
-    #%%
-    afm = AFM(radius=5e-6,invols=300, k=0.1,no_afm=3)
-    hc = hertz_constant(afm)
+    return integrate.quad(_integral_inner, start_t, t)[0]
 
 
-    truning_point = np.where(indentation_dev_func(time)<0)[0][0]
+def boltz_mann_superposition_principle_t1(t,tm,
+                                    delta_dev:callable,
+                                    property_func:callable = et_e1,
+                                    start_t=0
+                                    ):
+    if start_t==t:
+        return 0
+    def _integral_inner(g):
+        # print("app")
+        # print(t, g, t-g)
+        # print(delta_dev(g), property_func(t-g))
+        return delta_dev(g)*property_func(t-g)
 
-    p = curve_fit(fit_func,time[:truning_point],force[:truning_point]*1e9,
-                    method="trf", p0=(1000,0,0.2), bounds=((0,0,0),(100000,100,1)),
-                    gtol=2.2e-16)
-    plt.plot(time[:truning_point],fit_func(time[:truning_point], *p[0]))
-    plt.plot(time[:truning_point],1e9*force[:truning_point])
-    print(p[0])
+    return integrate.quad(_integral_inner, start_t, tm)[0]
 
-    #%%
-    tp_idx = np.where(indentation_dev_func(time)>0)[0][-1]
-    print(time[tp_idx])
-    tm = brenth(indentation_dev_func,0,time[-1],xtol=2.2e-22, rtol=8.881784197001252e-13)
-    print(tm)
-    plt.scatter(time, indentation_dev_func(time))
-    #0.002528605318272992
-    #%%
-    plt.plot(indentation)
-    plt.plot(indentation_func(time))
-    plt.vlines(tp_idx, ymin = 0,ymax = 1e-6)
-    #%%
-    f_ting1 = ting(time, e0=100000,einf=10, alpha=0.5, 
-            t_turning_point=tm,
-            indentation_23_dev_func =indentation_23_dev_func,
-            indentation_dev_func = indentation_dev_func)
-    plt.plot(indentation[:tp_idx],f_ting1[:tp_idx])
-    plt.plot(indentation[tp_idx:],f_ting1[tp_idx:])
-    # f_ting2, t1 = ting(time, e0=100,einf=10, alpha=0.1, 
-    #         t_turning_point=tm,
-    #         indentation_23_dev_func =indentation_23_dev_func,
-    #         indentation_dev_func = indentation_dev_func)
-    # plt.plot(f_ting2)
-    #%%
-    #%%
-    p_ting = curve_fit(lambda t, e0,einf,alpha:1e9*ting(t, e0=e0,einf=einf, alpha=alpha, t_turning_point=tm,
-        indentation_23_dev_func =indentation_23_dev_func,
-        indentation_dev_func = indentation_dev_func),
-        time[:1200], 1e9*force[:1200], 
-        method="trf", p0=(100000,0,0.5) ,
-        bounds=((0,0,0),(np.inf,np.inf,1)))[0]
-    p_ting=p_ting
-    #%%
+def _app_integrate_t1(t, t1, tm, efunc):
+    return boltz_mann_superposition_principle_t1(t, tm,
+                                              indentation_dev_func, 
+                                              efunc, 
+                                              start_t=t1)
+T_DASH=1/50000
+def ting(time, e1, einf, alpha,
+         tp_idx,top_t,
+         indentation_dev_func,
+         indentation_23_dev_func
+         ):
+    tm = time[tp_idx]
+    def et_e1(t, e1, einf, alpha):
+        return einf+(e1-einf)*(t+T_DASH)**(-alpha)
+    efunc = lambda t:hc*et_e1(t,e1=e1, einf=einf, alpha=alpha)
+    t1s=[]
+    t1_pre=top_t
 
-    f_fit_ting = ting(time, e0=p_ting[0],einf=p_ting[1], alpha=p_ting[2], t_turning_point=tm,
-        indentation_23_dev_func =indentation_23_dev_func,
-        indentation_dev_func = indentation_dev_func)
+    k = 0
+    for t in time[tp_idx:]:
+        ret_integrate = boltz_mann_superposition_principle(t, 
+                                                            indentation_dev_func,
+                                                            efunc,
+                                                            start_t=top_t)
 
-    plt.plot(f_fit_ting[:1200])
-    # plt.plot(indentation*10**(-2.5))
-    # plt.plot(force[:1200])
-    # %%
-    tp_idx
-    plt.plot(indentation, f_fit_ting)
+
+        try:
+            t1 = brenth(lambda t1:ret_integrate+_app_integrate_t1(t,t1,top_t,efunc),
+                0,t1_pre, xtol=2.2e-23, rtol=8.881784197001252e-16)
+
+        except Exception as e:
+            # print(ret_integrate)
+            # print(ret_integrate+_app_integrate_t1(t,0,tm, efunc))
+            # print(ret_integrate+_app_integrate_t1(t,t1_pre,tm, efunc))
+            # print(e)
+            t1=0
+        k+=1
+
+        t1_pre=t1
+        t1s.append(t1)
+    app_int = [boltz_mann_superposition_principle(t, 
+                                                indentation_23_dev_func,
+                                                efunc, 
+                                                start_t=0) 
+                for t in time[:tp_idx] ]
+
+    ret_int = np.array([boltz_mann_superposition_principle(t, indentation_23_dev_func, efunc, start_t=0) 
+            for t in t1s ])
+    ting_curve=np.hstack([app_int,ret_int])
+    print(e1,einf,alpha)
+    return ting_curve
+
+top_t = brenth(indentation_dev_func,
+    0,time[-1], xtol=2.2e-23, rtol=8.881784197001252e-16)
+
+
+ting_fit_func = lambda time, e1,einf,alpha:1e9*ting(time, e1,einf,alpha,
+                                                tp_idx+1,top_t,
+                                                indentation_dev_func,
+                                                indentation_23_dev_func)
+
+
+p=curve_fit(ting_fit_func,time[:1400], 1e9*force[:1400],
+            p0=(100,0,0.1),bounds=((0,0,0),(1000,100,1)) )[0]
+ting_res = ting_fit_func(time,*p)
+#%%
+plt.plot(1e9*force[:1400])
+plt.plot(ting_res)
+plt.plot(indentation_func(time)*1e6)
+print(np.argmax(indentation_func(time)*1e6))
+#%%
+# ff, t1s = ting_fit_func(time,*[80,79,1])
+plt.plot(indentation_func(time)[:tp_idx],ff[:tp_idx])
+plt.plot(indentation_func(time)[tp_idx:],ff[tp_idx:])
+
+
+#%%
+def et_e1(t, e1, einf, alpha):
+    return einf+(e1-einf)*(t+T_DASH)**(-alpha)
+efunc = lambda t:hc*et_e1(t,e1=e1, einf=einf, alpha=alpha)
+
+ret_integrate = [boltz_mann_superposition_principle(t, 
+                                                    indentation_dev_func,
+                                                    efunc,
+                                                    start_t=tm) for t in time[tp_idx+1:]]
+plt.plot(ret_integrate)
+#%%
+
+
+#%%
+time_ = time.copy()
+p=curve_fit(ting_fit_func,time[:1400], force[:1400],
+            p0=(100,0,0.1),bounds=((0,0,0),(1000,100,1)) )[0]
+ting_res = ting_fit_func(time,*p)
+#%%
+ff = ting_fit_func(time,*[80,79,0])
+#%%
+# plt.plot(time[:1400],ting_res[:1400])
+# plt.plot(time,indentation_23_dev_func(time))
+plt.plot(time,indentation_func(time)*1e-3)
+plt.plot(time,ff)
+plt.plot(time,force)
+#%%
+ting_res
+
+#%%
+print(len(time),np.argmax(force),np.argmax(indentation_func(time)))
+#%%
+# from boltzmanns_superposition_principle import bsp_stress_relaxation_for_e0
+e1 = 10
+einf = 1
+alpha = 0.1
+
+# bsp_beta = bsp_stress_relaxation_for_e0(time[:tp_idx], e0=100,einf=0,alpha=0.9,
+#                              t_trig=tm,k_exp_app=1/2,k_coeff_app=3/2)
+def et_e1(t, e1, einf, alpha):
+    return einf+(e1-einf)*(t)**(-alpha)
+efunc = lambda t:hc*et_e1(t,e1=e1, einf=einf, alpha=alpha)
+app_int = [boltz_mann_superposition_principle(t, 
+                                            indentation_23_dev_func,
+                                                efunc, 
+                                                start_t=0) 
+                for t in time[:tp_idx] ]
+plt.plot(app_int)

@@ -43,7 +43,7 @@ y_fit  = np.hstack([
 
 fit_vartual_deflection = np.poly1d(np.polyfit(x_fit, y_fit, deg=2))
 sigmoid = lambda x,a,b,c,d: c/(1+np.exp(a*(x-b)))+d
-p = curve_fit(sigmoid, x_fit, y_fit, p0 = (0.3,app_point_sp_def,-1,0))
+p = curve_fit(sigmoid, x_fit, y_fit, p0 = (0.025,app_point_sp_def,-1,0))
 plt.plot(deflection)
 plt.plot(sigmoid(point_idx,*p[0]))
 
@@ -52,3 +52,9 @@ plt.plot(deflection_base)
 
 np.save("deflection",deflection_base)
 np.save("zsensor",zsensor)
+
+#%%
+plt.plot(sigmoid(np.arange(-10,10,0.01),1,1,1,1))
+#%%
+plt.plot(deflection_base[:np.argmax(deflection_base)])
+plt.plot(deflection_base[np.argmax(deflection_base):][::-1])

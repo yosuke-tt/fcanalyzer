@@ -56,7 +56,7 @@ def bsp_stress_relaxation_for_e0(t, e0,einf,alpha,t_trig,k_exp_app,k_coeff_app,k
                     for k_exp_sr,k_coeff_sr in zip(k_exp_srs,k_coeff_srs)],axis=0)
         bsp_in_sr=bsp_app_in_sr+bsp_sr
     bsp=np.append(bsp_app,bsp_in_sr)
-    return hertz_constant*bsp
+    return bsp
 
 def bsp_stress_relaxation_for_e1(t, e1,einf,alpha,t_trig,k_exp_app,k_coeff_app,k_exp_srs=(0,0),k_coeff_srs=(0,0)):
     t_app = t[t_trig>=t]
@@ -70,4 +70,4 @@ def bsp_stress_relaxation_for_e1(t, e1,einf,alpha,t_trig,k_exp_app,k_coeff_app,k
                     for k_exp_sr,k_coeff_sr in zip(k_exp_srs,k_coeff_srs)],axis=0)
         bsp_in_sr=bsp_app_in_sr+bsp_sr
     bsp=np.append(bsp_app,bsp_in_sr)
-    return hertz_constant*bsp
+    return bsp

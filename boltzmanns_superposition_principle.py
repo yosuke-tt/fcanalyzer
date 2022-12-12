@@ -34,7 +34,7 @@ def beta_bsp( t, k_exp, alpha,integral_range, t_dash = 1/50000):
 def beta_einf(k,integral_range):
     return (integral_range[1]**(k+1)-integral_range[0]**(k+1))/(k+1)
 
-def _bsp(t, e0,einf,alpha,k_exp,k_coeff,integral_range):
+def _bsp(t, e0, einf, alpha, k_exp,k_coeff,integral_range):
     beta_bsp_=beta_bsp(t, k_exp, alpha,integral_range)
     return k_coeff*(einf*beta_einf(k_exp,integral_range)+(e0-einf)*beta_bsp_[0]) 
 
@@ -43,13 +43,24 @@ def e1_bsp(t, e1,einf,alpha,k_exp,k_coeff,integral_range, t_dash=1/50000):
     return k_coeff*(einf*beta_einf(k_exp,integral_range)+(e1-einf)*((t_dash+t)**(1-alpha+k_coeff))*beta_bsp_[0]) 
 
 
-def bsp_stress_relaxation_for_e0(t, e0,einf,alpha,t_trig,k_exp_app,k_coeff_app,k_exp_srs=(0,0),k_coeff_srs=(0,0)):
+def bsp_stress_relaxation_for_e0(t, 
+                                 e0, einf, alpha,
+                                 t_trig,
+                                 k_exp_app,k_coeff_app,
+                                 k_exp_srs=(0,0),k_coeff_srs=(0,0)):
     t_app = t[t_trig>=t]
     t_sr = t[t_trig<t]
     bsp_app,bsp_in_sr=[],[]
 
     if len(t_app)>0:
-        bsp_app = _bsp(t_app, e0,einf,alpha,k_exp_app,k_coeff_app,integral_range=(0,t_app))
+
+        bsp_app = np.sum([_bsp(t_app,
+                               e0, einf, alpha,
+                               k_exp_app_, k_coeff_app_,
+                               integral_range=(0,t_app)
+                               )
+                    for k_exp_app_,k_coeff_app_ 
+                    in zip(k_exp_app, k_coeff_app)],axis=0)
     if len(t_sr)>0:
         bsp_app_in_sr = _bsp(t_sr, e0,einf,alpha,k_exp_app,k_coeff_app,integral_range=(0,t_trig))
         bsp_sr = np.sum([_bsp(t_sr, e0,einf,alpha,k_exp_sr, k_coeff_sr, integral_range=(t_trig,t_sr)) \

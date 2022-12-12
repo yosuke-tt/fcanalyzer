@@ -3,8 +3,8 @@ import warnings
 
 import numpy as np
 from scipy import integrate
-from scipy import stats
-from scipy.special import beta
+
+from scipy.special import beta, betainc
 
 
 from properties import *
@@ -27,7 +27,7 @@ def beta_bsp( t, k_exp, alpha,integral_range, t_dash = 1/50000):
     c_ = ((t+t_dash)**(k_exp-alpha+1))*(t_dash)**(alpha)
     beta_end = integral_range[1]/(t+t_dash)
     beta_start = integral_range[0]/(t+t_dash)
-    beta_incomp = stats.beta.cdf(beta_end,beta_a,beta_b)-stats.beta.cdf(beta_start,beta_a,beta_b)
+    beta_incomp = betainc(beta_a,beta_b,beta_end)-betainc(beta_a,beta_b,beta_start)
     c_beta = beta(beta_a, beta_b)*beta_incomp
     return c_*c_beta, c_
 

@@ -1,3 +1,4 @@
+
 import numpy as np
 
 
@@ -18,3 +19,7 @@ def et_e0(t, e0, einf, alpha):
 
 def et_e1(t, e1, einf, alpha):
     return einf+(e1-einf)*(t+T_DASH)**(-alpha)
+    
+def tension(fc, tension):
+    return np.pi*tension*fc.indentation
+

@@ -66,4 +66,3 @@ if __name__=="__main__":
     cps, baseline_coeffs = set_contact_point(fc)
             
 
-# %%

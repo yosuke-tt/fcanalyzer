@@ -1,2 +1,4 @@
 __pycache__/
 *.png
+*.npy
+.make_data/

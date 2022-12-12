@@ -13,7 +13,7 @@ from scipy.optimize import newton
 from properties import hertz_constant
 from afm import AFM 
 from properties import et_e0, et_e1
-from boltzmanns_superposition_principle import boltz_mann_superposition_principle
+from boltzmanns_superposition_principle import boltz_mann_superposition_principle,bsp_beta_for_e0
 
 #%%
 
@@ -69,19 +69,71 @@ def gen_indentaion_func(time, indentaion, output_coeff = False):
         return indentation_func, indentation_dev_func, indentation_23_dev_func
     else:
         return indentation_func, indentation_dev_func, indentation_23_dev_func
+
+
+
+import time as tt
+def searching_t1_bata(time_ret, top_t,
+                 indentation_dev_func,
+                efunc,
+                prop
+                ):
+    t1_pre=top_t
+    t1s = np.zeros(len(time_ret))
+
+    ind_dev_coeff = indentation_dev_func.coeffs
+    ind_dev_exp =np.arange(indentation_dev_func.order+1)[::-1]
+
+    ret_beta = hc*bsp_beta_for_e0(time_ret, top_t, time_ret, *prop,  
+                    ind_dev_exp, 
+                    ind_dev_coeff)
+
+
+    for i, t in enumerate(time_ret):
+        ret_integrate = ret_beta[i]
+
+
+        try:
+
+            t1 = brenth(lambda t1:ret_integrate+hc*bsp_beta_for_e0(t, t1, top_t,
+                                                                   *prop,
+                                                                   ind_dev_exp,
+                                                                   ind_dev_coeff ),
+                0,top_t, xtol=2.2e-23, rtol=8.881784197001252e-16)
+        except Exception as e:
+            break
+            
+        t1s[i]+=t1
+        t1_pre=t1
+    return t1s
+def ting_bata(time, 
+         properties_params,
+         top_t,
+         indentation_dev_func,
+         indentation_23_dev_func,
+         efunc_p):
+    efunc = lambda time:efunc_p(time,*properties_params)
+    t1s = searching_t1(time[time>top_t],
+                       top_t,
+                        indentation_dev_func,
+                        efunc,
+                        properties_params)
+
+    ind_23_dev_coeff = indentation_dev_func.coeffs
+    ind_23_dev_exp =np.arange(indentation_dev_func.order+1)[::-1]
+
     
+    app_int = bsp_beta_for_e0(time[:tp_idx], 0, time[:tp_idx],*properties_params,
+                    ind_23_dev_exp, ind_23_dev_coeff )
+
+    ret_int = bsp_beta_for_e0(t1s, 0, t1s,*properties_params,
+                    ind_23_dev_exp,ind_23_dev_coeff )
 
 
-#%%
 
-def boltz_mann_superposition_principle(start_t, end_t, t_now,
-                                    delta_dev:callable,
-                                    property_func:callable,
-                                    ):
+    ting_curve=np.hstack([app_int,ret_int])
+    return ting_curve
 
-    def _integral_inner(g):
-        return delta_dev(g)*property_func(t_now-g)
-    return integrate.quad(_integral_inner, start_t, end_t)[0]
 
 def searching_t1(time_ret, top_t,
                  indentation_dev_func,
@@ -152,16 +204,11 @@ if __name__ =="__main__":
     tp_idx = np.where(indentation_dev_func(time)>0)[0][-1]
 
     roots = indentation_dev_func.roots
-    tm = roots[np.isreal(roots)][0]
+    top_t = roots[np.isreal(roots)][0]
 
     afm = AFM(radius=5e-6,invols=30, k=0.1,no_afm=3)
     hc = hertz_constant(afm)
 
-    top_t = brenth(indentation_dev_func,
-                    0,
-                    time[-1],
-                    xtol=2.2e-23,
-                    rtol=8.881784197001252e-16)
 
 
     efunc = lambda t, e1, einf, alpha :hc*et_e1(t,e1=e1, einf=einf, alpha=alpha)

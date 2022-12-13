@@ -1,4 +1,4 @@
-
+from typing import Iterable
 import numpy as np
 
 from scipy import integrate
@@ -10,18 +10,41 @@ from scipy.special import beta, betainc
 ##
 ##積分による重畳原理
 ##
+
 ##############################################################################################################
 
-def bsp(start_t, end_t, t_now,
-                                    ind_dev:callable,
-                                    property_func:callable,
-                                    ):
 
-    def _integral_inner(g):
-        if np.isnan(ind_dev(g)*property_func(t_now-g)):
-            print(g, t_now-g, ind_dev(g),property_func(t_now-g))
-        return ind_dev(g)*property_func(t_now-g)
-    return integrate.quad(_integral_inner, start_t, end_t)[0]
+def bsp(start_t: float, end_t: float, time: Iterable(float),
+        ind_dev:callable, property_func:callable):
+    """
+    積分範囲(start_t, end_t)
+    property_func(time-g)*ind_dev(g)dg
+
+    Parameters
+    ----------
+    start_t, end_t: float
+        積分範囲
+    time : Iterable(float)
+        時間のリスト
+    ind_dev : callable
+        押し込みに関連する時間の関数
+        df(δ(t))/dt
+        ex ) f(δ) = δ**(3/2)
+    property_func : callable
+        押し込みに関連する時間の関数
+        ex ) E(t) = Einf-(E0-Einf)t^-α
+
+    Returns
+    -------
+    積分結果
+        
+    """
+    def bsp_each_time(start_t: float, end_t: float, t_now: float,
+                      ind_dev:callable,property_func:callable):
+        def _integral_inner(g):
+            return ind_dev(g)*property_func(t_now-g)
+        return integrate.quad(_integral_inner, start_t, end_t)[0]
+    return [  bsp_each_time(start_t, end_t, t_now, ind_dev, property_func) for t_now in time ]
 
 
 
@@ -32,7 +55,7 @@ def bsp(start_t, end_t, t_now,
 ##
 ##############################################################################################################
 
-def _bsp_beta( t, k_exp, alpha,integral_range, t_dash = 1/50000):
+def _bsp_beta( t, k_exp, alpha, integral_range, t_dash = 1/50000):
     beta_a = k_exp+1
     beta_b = 1-alpha
 

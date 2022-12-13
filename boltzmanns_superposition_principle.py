@@ -16,6 +16,8 @@ def boltz_mann_superposition_principle(start_t, end_t, t_now,
                                     ):
 
     def _integral_inner(g):
+        if np.isnan(ind_dev(g)*property_func(t_now-g)):
+            print(g, t_now-g, ind_dev(g), property_func(t_now-g))
         return ind_dev(g)*property_func(t_now-g)
     return integrate.quad(_integral_inner, start_t, end_t)[0]
 

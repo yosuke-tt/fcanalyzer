@@ -30,5 +30,4 @@ if __name__=="__main__":
                     deflection = fc[:,:len(fc)//2],
                     zsensor = fc[:,len(fc)//2:],
                     xstep = config["Xstep"],
->>>>>>> fc_dataclass
                     ystep = config["Ystep"])

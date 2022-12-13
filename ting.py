@@ -9,9 +9,9 @@ from scipy.optimize import  brentq
 import sys
 sys.path.append(".")
 import importlib
-import boltzmanns_superposition_principle
-importlib.reload(boltzmanns_superposition_principle)
-from boltzmanns_superposition_principle import boltz_mann_superposition_principle, bsp_beta_for_e0
+import bsp
+importlib.reload(bsp)
+from bsp import bsp, bsp_beta_e0
 #%%
 
 
@@ -85,7 +85,7 @@ def searching_t1_bata(time_ret, top_t,
     ind_dev_coeff = indentation_dev_func.coeffs
     ind_dev_exp =np.arange(indentation_dev_func.order+1)[::-1]
 
-    ret_beta = bsp_beta_for_e0(time_ret, top_t, time_ret, *prop,  
+    ret_beta = bsp_beta_e0(time_ret, top_t, time_ret, *prop,  
                     ind_dev_exp, 
                     ind_dev_coeff)
 
@@ -93,14 +93,13 @@ def searching_t1_bata(time_ret, top_t,
     for i, t in enumerate(time_ret):
         ret_integrate = ret_beta[i]
 
-
         try:
 
-            t1 = brentq(lambda t1:ret_integrate+bsp_beta_for_e0(t, t1, top_t,
+            t1 = brentq(lambda t1:ret_integrate+bsp_beta_e0(t, t1, top_t,
                                                                    *prop,
                                                                    ind_dev_exp,
                                                                    ind_dev_coeff ),
-                0,t1_pre, xtol=2.2e-23, rtol=8.881784197001252e-16)
+                0,t1_pre)
         except Exception as e:
             break
             
@@ -123,10 +122,10 @@ def ting_bata(time,
     ind_23_dev_coeff = indentation_23_dev_func.coeffs
     ind_23_dev_exp =np.arange(indentation_23_dev_func.order+1)[::-1]
 
-    app_int = bsp_beta_for_e0(time[time<top_t], 0, time[time<top_t],*properties_params,
+    app_int = bsp_beta_e0(time[time<top_t], 0, time[time<top_t],*properties_params,
                     ind_23_dev_exp, ind_23_dev_coeff )
 
-    ret_int = bsp_beta_for_e0(t1s, 0, t1s,*properties_params,
+    ret_int = bsp_beta_e0(t1s, 0, t1s,*properties_params,
                     ind_23_dev_exp,ind_23_dev_coeff )
 
 
@@ -142,15 +141,13 @@ def searching_t1(time_ret,
     t1_pre=top_t
     t1s = np.zeros(len(time_ret))
     for i, t in enumerate(time_ret):
-        ret_integrate = boltz_mann_superposition_principle(top_t, t, t,
+        ret_integrate = bsp(top_t, t, t,
                                                             indentation_dev_func,
                                                             efunc
                                                             )
 
         try:
-            t1 = brentq(lambda t1:ret_integrate+boltz_mann_superposition_principle(t1,top_t,t,
-                                                                                   indentation_dev_func,
-                                                                                   efunc),
+            t1 = brentq(lambda t1:ret_integrate+bsp(t1,top_t,t,indentation_dev_func,efunc),
                 0,t1_pre)
         except Exception as e:
             print(e)
@@ -172,12 +169,11 @@ def ting(time, properties_params,
                         indentation_dev_func,
                         efunc)
 
-    app_int = [boltz_mann_superposition_principle(0, t, t,
+    app_int = [bsp(0, t, t,
                                                 indentation_23_dev_func,
                                                 efunc) 
                 for t in time[:tp_idx+1] ]
-    ret_int = np.array([boltz_mann_superposition_principle(0, t, t,
-                                                           indentation_23_dev_func,
+    ret_int = np.array([bsp(0, t, t,indentation_23_dev_func,
                                                            efunc) 
             for t in t1s ])
     ting_curve=np.hstack([app_int,ret_int])

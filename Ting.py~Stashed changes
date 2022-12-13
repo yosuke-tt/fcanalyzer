@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-from scipy.optimize import curve_fit, brenth
+from scipy.optimize import curve_fit, brentq
 from scipy import integrate  
 from scipy.optimize import newton
 
@@ -30,7 +30,7 @@ def searching_t1(time,
     for t in time[turning_point:]:
         ret_integrate = boltz_mann_superposition_principle(t, indentation_dev_func, efunc, start_t=t_turning_point) 
         try:
-            t1 = brenth(lambda t1:ret_integrate+_app_integrate_t1(t1),
+            t1 = brentq(lambda t1:ret_integrate+_app_integrate_t1(t1),
                     0,t_turning_point, xtol=2.2e-23, rtol=8.881784197001252e-16)
         except Exception as e:
             t1 = 0
@@ -131,7 +131,7 @@ if __name__ == "__main__":
     indentation_dev_func = indentation_func.deriv()
     tp_idx = np.where(indentation_dev_func(time)>0)[0][-1]
     print(time[tp_idx])
-    tm = brenth(indentation_dev_func,0,time[-1],xtol=2.2e-22, rtol=8.881784197001252e-13)
+    tm = brentq(indentation_dev_func,0,time[-1],xtol=2.2e-22, rtol=8.881784197001252e-13)
     e0 = 100000
     einf = 10
     alpha = 0.5
@@ -153,7 +153,7 @@ if __name__ == "__main__":
         print(t)
         print(ret_integrate, _app_integrate_t1(0), _app_integrate_t1(tm))                                                
         try:
-            t1 = brenth(lambda t1:ret_integrate+_app_integrate_t1(t1),
+            t1 = brentq(lambda t1:ret_integrate+_app_integrate_t1(t1),
                     0,tm, xtol=2.2e-23, rtol=8.881784197001252e-16)
             print(ret_integrate+_app_integrate_t1(t1))
     

@@ -1,14 +1,16 @@
-import warnings
-
 
 import numpy as np
-from scipy import integrate
 
+from scipy import integrate
 from scipy.special import beta, betainc
 
 
-from properties import *
 
+##############################################################################################################
+##
+##積分による重畳原理
+##
+##############################################################################################################
 
 def bsp(start_t, end_t, t_now,
                                     ind_dev:callable,
@@ -24,7 +26,12 @@ def bsp(start_t, end_t, t_now,
 
 
 
-warnings.simplefilter('ignore') 
+##############################################################################################################
+##
+##β関数による重畳原理
+##
+##############################################################################################################
+
 def _bsp_beta( t, k_exp, alpha,integral_range, t_dash = 1/50000):
     beta_a = k_exp+1
     beta_b = 1-alpha
@@ -37,13 +44,47 @@ def _bsp_beta( t, k_exp, alpha,integral_range, t_dash = 1/50000):
     return c_*c_beta
 
 
-
-
+##関数コールするようにしてまとめた方がいいかも
 def _beta_einf_bsp_beta(k,integral_range):
     return (integral_range[1]**(k+1)-integral_range[0]**(k+1))/(k+1)
 
+def bsp_beta_e0(time, integral_start, integral_end, 
+                    e0, einf, alpha,
+                    k_exp, k_coeff):
+    def _bsp_beta_e0(t, e0, einf, alpha, k_exp,k_coeff,integral_range):
+        bsp_res=_bsp_beta(t, k_exp, alpha,integral_range)
+        return k_coeff*(einf*_beta_einf_bsp_beta(k_exp,integral_range)+(e0-einf)*bsp_res) 
+    bsp_beta = np.sum([_bsp_beta_e0(time,
+                               e0, einf, alpha,
+                               k_exp_, k_coeff_,
+                               integral_range=(integral_start,integral_end)
+                               )
+                    for k_exp_,k_coeff_ 
+                    in zip(k_exp, k_coeff)],axis=0)
+    return bsp_beta
+
+def bsp_beta_e1(time, integral_start, integral_end, 
+                    e1, einf, alpha,
+                    k_exp, k_coeff):
+    def _bsp_beta_e1(t, e1,einf,alpha,k_exp,k_coeff,integral_range, t_dash=1/50000):
+        bsp_beta_res=_bsp_beta(t, k_exp, alpha,integral_range)
+        return k_coeff*(einf*_beta_einf_bsp_beta(k_exp,integral_range)+(e1-einf)*((t_dash+t)**(1-alpha+k_coeff))*bsp_beta_res) 
+    bsp_beta = np.sum([_bsp_beta_e1(time,
+                               e1, einf, alpha,
+                               k_exp_, k_coeff_,
+                               integral_range=(integral_start,integral_end)
+                               )
+                    for k_exp_,k_coeff_ 
+                    in zip(k_exp, k_coeff)],axis=0)
+    return bsp_beta
 
 
+
+##############################################################################################################
+##
+##応力緩和用ラッパー
+##
+##############################################################################################################
 def bsp_sr_e0(t, 
                                  e0, einf, alpha,
                                  t_trig,
@@ -77,37 +118,3 @@ def bsp_sr_e1(t, e1,einf,alpha,t_trig,
         bsp_app_in_sr+=bsp_sr
     bsp=np.append(bsp_app,bsp_in_sr)
     return bsp
-
-##関数コールするようにしてまとめた方がいいかも
-def _bsp_beta_e0(t, e0, einf, alpha, k_exp,k_coeff,integral_range):
-    bsp_res=_bsp_beta(t, k_exp, alpha,integral_range)
-    return k_coeff*(einf*_beta_einf_bsp_beta(k_exp,integral_range)+(e0-einf)*bsp_res) 
-
-def _bsp_beta_e1(t, e1,einf,alpha,k_exp,k_coeff,integral_range, t_dash=1/50000):
-    _bsp_beta_=_bsp_beta(t, k_exp, alpha,integral_range)
-    return k_coeff*(einf*_beta_einf_bsp_beta(k_exp,integral_range)+(e1-einf)*((t_dash+t)**(1-alpha+k_coeff))*_bsp_beta_) 
-
-def bsp_beta_e0(time, integral_start, integral_end, 
-                    e0, einf, alpha,
-                    k_exp, k_coeff):
-    bsp_beta = np.sum([_bsp_beta_e0(time,
-                               e0, einf, alpha,
-                               k_exp_, k_coeff_,
-                               integral_range=(integral_start,integral_end)
-                               )
-                    for k_exp_,k_coeff_ 
-                    in zip(k_exp, k_coeff)],axis=0)
-    return bsp_beta
-
-def bsp_beta_e1(time, integral_start, integral_end, 
-                    e1, einf, alpha,
-                    k_exp, k_coeff):
-    bsp_beta = np.sum([_bsp_beta_e1(time,
-                               e1, einf, alpha,
-                               k_exp_, k_coeff_,
-                               integral_range=(integral_start,integral_end)
-                               )
-                    for k_exp_,k_coeff_ 
-                    in zip(k_exp, k_coeff)],axis=0)
-    return bsp_beta
-

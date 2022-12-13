@@ -14,7 +14,7 @@ from scipy.special import beta, betainc
 ##############################################################################################################
 
 
-def bsp(start_t: float, end_t: float, time: Iterable(float),
+def bsp(start_t: float, end_t: float, time: Iterable[float],
         ind_dev:callable, property_func:callable):
     """
     積分範囲(start_t, end_t)

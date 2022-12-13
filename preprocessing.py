@@ -3,7 +3,57 @@ import numpy as np
 from scipy.optimize import minimize, brute, curve_fit
 
 from force_curve import ForceVolumeCurve
+def get_cp(deflection):
+    return np.where(deflection[:len(deflection)//2]<0.005)[0][-1]
 
+
+def gen_indentaion_func(time, indentaion, output_coeff = False, fit_dim=10):
+    
+    indentation_fit = np.polyfit(time, indentaion, deg=fit_dim)
+    indentation_func = np.poly1d(indentation_fit)
+    indentation_dev_func = indentation_func.deriv()
+    indentation_23_dev_func = lambda t:3*indentation_dev_func(t)*(indentation_func(t)**(1/2))/2    
+    if not output_coeff:
+        return indentation_func, indentation_dev_func, indentation_23_dev_func
+    else:
+        return indentation_func, indentation_dev_func, indentation_23_dev_func
+
+def preprocessing(deflection, 
+                  zsensor, 
+                  get_cp,
+                  invols=30, 
+                  um_per_v=25e-6, 
+                  sampling_t=3e-6,
+                  dim_fit=10):
+    
+    cp = get_cp(deflection)
+    deflection-=deflection[cp]
+    diff_top_idx = np.argmax(deflection) - np.argmax(zsensor)
+    zsensor = zsensor[-diff_top_idx:]
+    deflection = deflection[:diff_top_idx]
+    ret_cp = np.argmax(zsensor)+np.where(zsensor[np.argmax(zsensor):]<zsensor[cp])[0][0]
+
+    deformation_cantilever = deflection*invols*1e-9
+    force      = deformation_cantilever*0.1
+
+    indentation_pre = zsensor*um_per_v-deformation_cantilever
+    
+    diff_top_idx = np.argmax(indentation_pre)-np.argmax(force)
+    force = force[cp:ret_cp]
+    time = np.arange(0,len(force))*sampling_t
+
+    indentation = indentation_pre[cp+diff_top_idx:ret_cp+diff_top_idx]-indentation_pre[cp+diff_top_idx]
+    indentation_func, indentation_dev_func, indentation_23_dev_func = gen_indentaion_func(time,indentation)
+    tp_idx = np.where(indentation_dev_func(time)>=0)[0][-1]
+    diff_top_idx -= np.argmax(force)-tp_idx
+
+    indentation = indentation_pre[cp+diff_top_idx:ret_cp+diff_top_idx]-indentation_pre[cp+diff_top_idx]
+    indentation_pos_idx = indentation>0
+    indentation_func, indentation_dev_func, indentation_23_dev_func = gen_indentaion_func(time[indentation_pos_idx], indentation[indentation_pos_idx])
+    
+    indentation_23_dev_func_for_beta = np.poly1d(np.polyfit(time[indentation_pos_idx], indentation[indentation_pos_idx]**(3/2),deg=dim_fit)).deriv()
+    
+    return force[indentation_pos_idx], indentation_func, indentation_dev_func, indentation_23_dev_func, indentation_23_dev_func_for_beta, time[indentation_pos_idx]
 
 def get_cp_under_th(deflection, 
                     baseline_num:int|float = 0.9,

@@ -94,7 +94,6 @@ def preprocessing(deflection,
     
     indentation = indentation_pre[cp+diff_top_idx:ret_cp+diff_top_idx]-indentation_pre[cp+diff_top_idx]
     
-    
     if is_line_ind:
         indentation_func, indentation_dev_func, indentation_23_dev_func, dec_app, dec_ret = gen_indentaion_func_line(time,indentation)
     else:

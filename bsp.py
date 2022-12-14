@@ -71,9 +71,13 @@ def _bsp_beta( t, k_exp, alpha, integral_range, t_dash = 1/50000):
 def _beta_einf_bsp_beta(k,integral_range):
     return (integral_range[1]**(k+1)-integral_range[0]**(k+1))/(k+1)
 
-def bsp_beta_e0(time, integral_start, integral_end, 
+def bsp_beta_e0(time:Iterable[float], 
+                integral_start, integral_end, 
                     e0, einf, alpha,
                     k_exp, k_coeff):
+    # e0を用いた重畳原理をβを用いて計算する（高速化のため）
+
+
     def _bsp_beta_e0(t, e0, einf, alpha, k_exp,k_coeff,integral_range):
         bsp_res=_bsp_beta(t, k_exp, alpha,integral_range)
         return k_coeff*(einf*_beta_einf_bsp_beta(k_exp,integral_range)+(e0-einf)*bsp_res) 
@@ -108,8 +112,7 @@ def bsp_beta_e1(time, integral_start, integral_end,
 ##応力緩和用ラッパー
 ##
 ##############################################################################################################
-def bsp_sr_e0(t, 
-                                 e0, einf, alpha,
+def bsp_sr_e0(t, e0, einf, alpha,
                                  t_trig,
                                  k_exp_app,k_coeff_app,
                                  k_exp_srs=(0,0),k_coeff_srs=(0,0)):

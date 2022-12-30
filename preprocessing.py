@@ -25,12 +25,13 @@ def gen_indentaion_func_line(time, indentaion):
     max_ind_idx = np.argmax(indentaion)
     max_ind_time = time[np.argmax(indentaion)]
     indentation_fit_app  = np.poly1d(np.polyfit(time[:max_ind_idx], 
-                                      indentaion[:max_ind_idx],
-                                      deg=1))
+                                                indentaion[:max_ind_idx],
+                                                deg=1)
+                                     )
     indentation_fit_ret_ = curve_fit(lambda x, a: a*(x-time[max_ind_idx])+ indentaion[max_ind_idx], 
                                      time[max_ind_idx:],
                                      indentaion[max_ind_idx:])[0]
-    indentation_fit_ret = lambda time:indentation_fit_ret_*(time-max_ind_time)+ indentaion[max_ind_idx]
+    indentation_fit_ret = lambda time: indentation_fit_ret_*(time-max_ind_time)+ indentaion[max_ind_idx]
     
     def gen_indentation_func(indentation_fit_app, indentation_fit_ret, max_ind_time):
         def indentation_func_line(time:Iterable[float]):
@@ -51,7 +52,7 @@ def gen_indentaion_func_line(time, indentaion):
                                                     indentation_fit_ret_,
                                                     max_ind_time)
     indentation_23_dev_func = lambda t:3*indentation_dev_func(t)*(indentation_func(t)**(1/2))/2    
-    return indentation_func, indentation_dev_func, indentation_23_dev_func, indentation_fit_app.coef[0], indentation_fit_ret_
+    return indentation_func, indentation_dev_func, indentation_23_dev_func, max_ind_idx, max_ind_time
 
 def gen_indentaion_23_func_line_beta(time, indentaion):
 

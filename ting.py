@@ -22,9 +22,6 @@ from bsp import bsp, bsp_beta_e0, bsp_beta_e1
 
 
 
-import time as tt
-
-
 
 def ting_bata(time:Iterable[float],
               top_t:float,
@@ -170,7 +167,6 @@ def ting(time:Iterable[float],
 
     app_int = bsp(0, time[time<=top_t], time[time<=top_t], indentation_23_dev_func, efunc)
     ret_int = bsp(0, t1s,               t1s,               indentation_23_dev_func, efunc) 
-
     ting_curve=np.hstack([app_int,ret_int])
     return ting_curve
 

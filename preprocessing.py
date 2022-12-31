@@ -12,109 +12,175 @@ from force_curve import ForceVolumeCurve
 
 
 
-def gen_indentaion_func(time, indentaion, output_coeff = False, fit_dim=10):
-    
-    indentation_fit = np.polyfit(time, indentaion, deg=fit_dim)
-    indentation_func = np.poly1d(indentation_fit)
-    indentation_dev_func = indentation_func.deriv()
-    indentation_23_dev_func = lambda t:3*indentation_dev_func(t)*(indentation_func(t)**(1/2))/2    
-    return indentation_func, indentation_dev_func, indentation_23_dev_func
+
+def _gen_indentation_func(indentation_app_func, indentation_fit_ret, max_ind_time):
+    def indentation_func(time:Iterable[float]):
+        time_app = time[time<=max_ind_time]
+        time_ret = time[time>max_ind_time]
+        return np.hstack([indentation_app_func(time_app), indentation_fit_ret(time_ret)])
+    return indentation_func
+
+def _gen_indentation_dev_func(indentation_dev_app, indentation_dev_fit_ret, max_ind_time):
+    def indentation_dev_func(time:Iterable[float]):
+        decline = np.zeros(len(time))
+        time_app = time[time<=max_ind_time]
+        time_ret = time[time>max_ind_time]
+        
+        decline[time<=max_ind_time]+=indentation_dev_app(time_app)
+        decline[time>max_ind_time] +=indentation_dev_fit_ret(time_ret)
+        return decline
+    return indentation_dev_func
+
+def _exp(time, *args):
+    return np.sum([ a*time**b 
+                   for a,b in zip(args[:len(args)//2],args[len(args)//2:])],
+                   axis=0)
+
+def _dev_coeff(*args):
+    dev_tmp =  np.hstack([ [a*b, b-1] 
+                      for a,b in zip(args[:len(args)//2],args[len(args)//2:]) if b!=0])
+    return np.hstack([dev_tmp[::2],dev_tmp[1::2]])
+
+def _fix_multi_func(time, fix_point, *args):
+    return np.sum([a*(time-fix_point[0])**b if b!=0  else fix_point[1] 
+            for a, b in zip(args[:len(args)//2],args[len(args)//2:])],axis=0)
 
 
-def gen_indentaion_func_line(time, indentaion):
-    max_ind_idx = np.argmax(indentaion)
-    max_ind_time = time[np.argmax(indentaion)]
-    indentation_fit_app  = np.poly1d(np.polyfit(time[:max_ind_idx], 
+
+def gen_indentaion_func_multi(time, indentaion, fit_deg=10, return_coeff=False):
+
+    max_ind_idx  = np.argmax(indentaion)
+    max_ind_time = time[max_ind_idx]
+    indentation_app_func_coeff = np.polyfit(time[:max_ind_idx], 
                                                 indentaion[:max_ind_idx],
-                                                deg=1)
-                                     )
-    indentation_fit_ret_ = curve_fit(lambda x, a: a*(x-time[max_ind_idx])+ indentaion[max_ind_idx], 
-                                     time[max_ind_idx:],
-                                     indentaion[max_ind_idx:])[0]
-    indentation_fit_ret = lambda time: indentation_fit_ret_*(time-max_ind_time)+ indentaion[max_ind_idx]
+                                                deg=fit_deg)
+    indentation_app_func  = np.poly1d(indentation_app_func_coeff)
+    max_ind_point =[ max_ind_time, indentation_app_func(max_ind_time)]
+    indentation_ret_coeff = curve_fit(lambda time, *args:_fix_multi_func(time, 
+                                                                           max_ind_point,
+                                                                           *args,*np.arange(fit_deg+1)),
+                                        time[max_ind_idx:],
+                                        indentaion[max_ind_idx:],
+                                        p0 = -np.ones(fit_deg+1),maxfev=10000,
+                                        ftol=2.23e-12, xtol=2.23e-12, gtol=2.23e-12
+                                        )[0]
+    indentation_fit_ret = lambda time : _fix_multi_func(time, max_ind_point, *indentation_ret_coeff,*np.arange(fit_deg+1))
+    indentation_fit_dev_ret_coeff=_dev_coeff(*indentation_ret_coeff,*np.arange(fit_deg+1))
+    indentation_dev_fit_ret =lambda time: _fix_multi_func(time, [max_ind_point[0],indentation_fit_dev_ret_coeff[::2][0]], 
+                                                          *indentation_fit_dev_ret_coeff[::2],
+                                                          *indentation_fit_dev_ret_coeff[1::2])
     
-    def gen_indentation_func(indentation_fit_app, indentation_fit_ret, max_ind_time):
-        def indentation_func_line(time:Iterable[float]):
-            time_app = time[time<=max_ind_time]
-            time_ret = time[time>max_ind_time]
-            return np.hstack([indentation_fit_app(time_app), indentation_fit_ret(time_ret)])
-        return indentation_func_line
-    
-    def gen_indentation_dev_func(dec_app, dec_ret, max_ind_time):
-        def indentation_dev_func_line(time:Iterable[float]):
-            decline = np.zeros(len(time))
-            decline[time<=max_ind_time]+=dec_app
-            decline[time>max_ind_time]+=dec_ret    
-            return decline
-        return indentation_dev_func_line
-    indentation_func = gen_indentation_func(indentation_fit_app, indentation_fit_ret, max_ind_time)
-    indentation_dev_func = gen_indentation_dev_func(indentation_fit_app.coef[0],
-                                                    indentation_fit_ret_,
+    indentation_func =     _gen_indentation_func(indentation_app_func, indentation_fit_ret, max_ind_time)
+    indentation_dev_func = _gen_indentation_dev_func(indentation_app_func.deriv(),
+                                                    indentation_dev_fit_ret,
                                                     max_ind_time)
-    indentation_23_dev_func = lambda t:3*indentation_dev_func(t)*(indentation_func(t)**(1/2))/2    
-    return indentation_func, indentation_dev_func, indentation_23_dev_func, max_ind_idx, max_ind_time
+    indentation_32_dev_func = lambda t:(3/2)*indentation_dev_func(t)*(indentation_func(t)**(1/2))
+    if not return_coeff:
+        
+        return indentation_func, indentation_dev_func, indentation_32_dev_func, max_ind_idx, max_ind_time
+    else:
+        ind_app_pos_idx = indentaion[:max_ind_idx]>0
+        ind32_app_coeff         =np.polyfit(time[:max_ind_idx][ind_app_pos_idx], 
+                                            indentaion[:max_ind_idx][ind_app_pos_idx]**(3/2),
+                                            deg=fit_deg)
+        ind32_app_dev_coeff = np.poly1d(ind32_app_coeff).deriv()
+        ind32_app_dev_func =  np.poly1d(ind32_app_dev_coeff)
 
+        return (indentation_func,
+                (
+                 np.hstack([indentation_app_func_coeff, np.arange(fit_deg,-1, -1)]),
+                 np.hstack([indentation_ret_coeff, np.arange(fit_deg+1)])
+                ),\
+                (indentation_dev_func,
+                 np.hstack([indentation_app_func.deriv().coefficients, np.arange(fit_deg,-1, -1)]),
+                 np.hstack([indentation_ret_coeff, np.arange(fit_deg+1)])
+                 ), \
+                (ind32_app_dev_func,
+                 np.hstack([ind32_app_dev_coeff, np.arange(fit_deg-1,-1, -1)])
+                 ),\
+                max_ind_idx, max_ind_time, ind_app_pos_idx
+                )
+    
+    
+def gen_indentaion_func_exp(time, indentaion, num_dim=2, return_coeff=False):
+
+    max_ind_idx  = np.argmax(indentaion)
+    max_ind_time = time[max_ind_idx]
+    
+    p0 = np.hstack([np.ones(num_dim), np.arange(num_dim)])
+    
+    indentation_app_coeff  = curve_fit(_exp,
+                                        time[:max_ind_idx], indentaion[:max_ind_idx],
+                                        p0 = p0,
+                                        maxfev=10000,ftol=2.23e-12, xtol=2.23e-12, gtol=2.23e-12
+                                        )[0]
+    indentation_dev_app_coeff = _dev_coeff(*indentation_app_coeff)
+
+    indentation_dev_app =lambda time: _exp(time, *indentation_dev_app_coeff[::2],
+                                                 *indentation_dev_app_coeff[1::2])
+    indentation_app_func = lambda time: _exp(time, *indentation_app_coeff)
+
+    max_ind_point = [time[max_ind_idx], indentation_app_func(time[max_ind_idx])]
+
+    indentation_ret_coeff = curve_fit(lambda time, *args:_fix_multi_func(time, 
+                                                                        max_ind_point,
+                                                                        *args),
+                                    time[max_ind_idx:], indentaion[max_ind_idx:],
+                                    p0 = np.hstack([-np.ones(num_dim)*1e-5,np.arange(num_dim)/2]),
+                                    bounds = (np.hstack([-np.ones(num_dim)*np.inf,np.zeros(num_dim)]),
+                                              np.hstack([np.ones(num_dim),np.ones(num_dim)*np.inf])),
+                                    maxfev=1000000,ftol=2.23e-12, xtol=2.23e-12, gtol=2.23e-12
+                                    )[0]
+    indentation_fit_ret = lambda time : _fix_multi_func(time, max_ind_point, *indentation_ret_coeff)
+    
+    indentation_dev_ret_coeff = _dev_coeff(*indentation_ret_coeff)
+
+    indentation_dev_ret =lambda time: _fix_multi_func(time, [max_ind_point[0],indentation_dev_ret_coeff[::2][0]], 
+                                                          *indentation_dev_ret_coeff[::2],
+                                                          *indentation_dev_ret_coeff[1::2])
+
+    indentation_func =     _gen_indentation_func(indentation_app_func, indentation_fit_ret, max_ind_time)
+    indentation_dev_func = _gen_indentation_dev_func(indentation_dev_app,
+                                                    indentation_dev_ret,
+                                                    max_ind_time)
+    indentation_23_dev_func = lambda t:(3/2)*indentation_dev_func(t)*(indentation_func(t)**(1/2))
+    if not return_coeff:
+        return indentation_func, indentation_dev_func, indentation_23_dev_func, max_ind_idx, max_ind_time
+    else:
+        ind_app_pos_idx = indentaion[:max_ind_idx]>0
+        ind32_app_coeff =curve_fit( _exp,
+                                    time[:max_ind_idx][ind_app_pos_idx], 
+                                    indentaion[:max_ind_idx][ind_app_pos_idx]**(3/2),
+                                    p0=p0)[0]
+        
+        ind32_app_dev_coeff = _dev_coeff(*ind32_app_coeff)
+        ind32_app_dev_func = lambda time:_exp(time,*ind32_app_coeff)
+        return (indentation_func, 
+                (indentation_app_coeff, indentation_ret_coeff),
+                ),\
+                (indentation_dev_func, 
+                 (indentation_dev_app_coeff, indentation_dev_ret_coeff)
+                 ), \
+                (ind32_app_dev_func,
+                 (ind32_app_dev_coeff[::2],ind32_app_dev_coeff[::2])
+                 ), \
+                max_ind_idx, max_ind_time, ind_app_pos_idx
+                
+                
 def gen_indentaion_23_func_line_beta(time, indentaion):
 
     max_ind_idx = np.argmax(indentaion)
     app_23_func = lambda x, a, b, c: a*x**(3/2)+b*x+c
-    indentation_fit_app  = curve_fit(app_23_func,time[:max_ind_idx], indentaion[:max_ind_idx])[0]
-    indentation_23_dev_func = lambda time : app_23_func(time, *indentation_fit_app)
+    indentation_app_func  = curve_fit(app_23_func,time[:max_ind_idx], indentaion[:max_ind_idx])[0]
+    indentation_23_dev_func = lambda time : app_23_func(time, *indentation_app_func)
 
-    return  indentation_23_dev_func, indentation_fit_app,[3/2,1,0] 
+    return  indentation_23_dev_func, indentation_app_func,[3/2,1,0] 
 
 def get_cp(deflection, def_th = 0.008):
     return np.where(deflection[:len(deflection)//2]<def_th)[0][-1]
 def get_ret_cp(zsensor, cp):
     return np.argmax(zsensor)+np.where(zsensor[np.argmax(zsensor):]<zsensor[cp])[0][0]
 
-
-
-def preprocessing(deflection, 
-                  zsensor, 
-                  get_cp,
-                  invols=200, 
-                  um_per_v=25e-6, 
-                  sampling_t=10e-6,
-                  dim_fit=10,
-                  is_line_ind = True):
-    
-    cp = get_cp(deflection)
-    deflection-=deflection[cp]
-    diff_top_idx = np.argmax(deflection) - np.argmax(zsensor)
-    zsensor = zsensor[-diff_top_idx:]
-    deflection = deflection[:diff_top_idx]
-    ret_cp = get_ret_cp(zsensor, cp)
-    
-    deformation_cantilever = deflection*invols*1e-9
-    force      = deformation_cantilever*0.1
-    indentation_pre = zsensor*um_per_v-deformation_cantilever
-    diff_top_idx = np.argmax(indentation_pre)-np.argmax(force)
-    force = force[cp:ret_cp]
-    time = np.arange(0,len(force))*sampling_t
-    
-    indentation = indentation_pre[cp+diff_top_idx:ret_cp+diff_top_idx]-indentation_pre[cp+diff_top_idx]
-    
-    if is_line_ind:
-        indentation_func, indentation_dev_func, indentation_23_dev_func, dec_app, dec_ret = gen_indentaion_func_line(time,indentation)
-    else:
-        indentation_func, indentation_dev_func, indentation_23_dev_func = gen_indentaion_func(time,indentation)
-    tp_idx = np.where(indentation_dev_func(time)>=0)[0][-1]
-    diff_top_idx -= np.argmax(force)-tp_idx
-
-    indentation = indentation_pre[cp+diff_top_idx:ret_cp+diff_top_idx]-indentation_pre[cp+diff_top_idx]
-    indentation_pos_idx = indentation>0
-    if is_line_ind:
-        indentation_func, indentation_dev_func, indentation_23_dev_func, dec_app, dec_ret = gen_indentaion_func_line(time[indentation_pos_idx], indentation[indentation_pos_idx])
-    else:
-        indentation_func, indentation_dev_func, indentation_23_dev_func = gen_indentaion_func(time[indentation_pos_idx], indentation[indentation_pos_idx])
-    
-    if is_line_ind:
-        indentation_23_dev_func_for_beta = gen_indentaion_23_func_line_beta(time, indentation[indentation_pos_idx])
-    else:
-        indentation_23_dev_func_for_beta = np.poly1d(np.polyfit(time[indentation_pos_idx], indentation[indentation_pos_idx]**(3/2),deg=dim_fit)).deriv()
-
-    return force[indentation_pos_idx], indentation_func, indentation_dev_func, indentation_23_dev_func, indentation_23_dev_func_for_beta, time[indentation_pos_idx], dec_app, dec_ret
 
 def get_cp_under_th(deflection, 
                     baseline_num:int|float = 0.9,
@@ -151,29 +217,3 @@ def set_contact_point(fc:ForceVolumeCurve,
         cps[i]+=cp
         baseline_coeffs[i]+=baseline_coeff
     return cps, baseline_coeffs
-#%%
-if __name__=="__main__":
-
-    from glob import glob
-    import matplotlib.pyplot as plt
-    import pandas as pd
-    from afm import AFM
-    from force_curve import ForceVolumeCurve
-    fc = glob("D:/tsuboyama/AFM3/data_20221203//data_163902/ForceCurve/*")
-    config = pd.read_csv("D:/tsuboyama/AFM3/data_20221203/data_163902/config.txt",
-                        encoding="shift-jis",
-                        index_col=0)
-
-    fc = np.array([np.loadtxt(fcc) for fcc in fc[:2]])
-
-
-    afm = AFM(5e-6, 200, 0.1, 2)
-    
-    fc = ForceVolumeCurve(afm =afm,
-                    deflection = fc[:,:len(fc[0])//2],
-                    zsensor = fc[:,len(fc[0])//2:],
-                    xstep = config.loc["Xstep"],
-                    ystep = config.loc["Ystep"])
-    cps, baseline_coeffs = set_contact_point(fc)
-            
-

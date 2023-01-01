@@ -17,24 +17,15 @@ importlib.reload(bsp)
 from bsp import bsp, bsp_beta_e0, bsp_beta_e1
 #%%
 
-
-
-
-
-
-import time as tt
-
-
-
 def ting_bata(time:Iterable[float],
               top_t:float,
               properties_params:Iterable[float], 
-              ind_dev_app_exp:Iterable[float],
               ind_dev_app_coeff:Iterable[float],
-              ind_dev_ret_exp:Iterable[float],
+              ind_dev_app_exp:Iterable[float],
               ind_dev_ret_coeff:Iterable[float],
-              ind_23_dev_func_exp:Iterable[float],
+              ind_dev_ret_exp:Iterable[float],
               ind_23_dev_func_coeff:Iterable[float],
+              ind_23_dev_func_exp:Iterable[float],
               beta_e_func:str="e0"
               ):
 
@@ -75,7 +66,7 @@ def ting_bata(time:Iterable[float],
     _type_
         _description_
     """
-    def _searching_t1_bata(time_ret, bsp_beta, properties):
+    def _searching_t1_bata(time_ret, top_t, bsp_beta, properties):
         """t1をβ関数に変換した重畳で求める方法（高速化のため）
 
         Parameters
@@ -89,21 +80,24 @@ def ting_bata(time:Iterable[float],
         t1_pre=top_t
         t1s = np.zeros(len(time_ret))
         
-        ret_beta = bsp_beta(time_ret, top_t, time_ret, *properties, ind_dev_app_exp, ind_dev_app_coeff)
-        
+        ret_beta = bsp_beta(time_ret, top_t, time_ret, *properties,
+                            ind_dev_ret_exp, ind_dev_ret_coeff)
         for i, t in enumerate(time_ret):
             ret_integrate = ret_beta[i]
             try:
                 t1 = brentq(lambda t1:ret_integrate+bsp_beta(t, t1, top_t,*properties,
-                                                                ind_dev_ret_exp,ind_dev_ret_coeff),0,t1_pre)
+                                                                ind_dev_app_exp,ind_dev_app_coeff),
+                            0,t1_pre)
             except Exception as e:
+                print(e)
                 break
             t1s[i]+=t1
             t1_pre=t1
         return t1s
-    bsp_beta_dict = {"e0":bsp_beta_e0,"e1":bsp_beta_e1}
+    bsp_beta_dict = {"e0":bsp_beta_e0, "e1":bsp_beta_e1}
     bsp_beta = bsp_beta_dict[beta_e_func]
-    t1s = _searching_t1_bata(time[time>top_t],
+
+    t1s = _searching_t1_bata(time[time>top_t], top_t,
                             bsp_beta, properties_params)
     app_int = bsp_beta(time[time<=top_t], 0, time[time<=top_t],*properties_params, 
                           ind_23_dev_func_exp, ind_23_dev_func_coeff )
@@ -116,8 +110,8 @@ def ting_bata(time:Iterable[float],
 
 
 def ting(time:Iterable[float],
-         properties_params:Iterable[float],
          top_t:float,
+         properties_params:Iterable[float],
          indentation_dev_func:callable,
          indentation_23_dev_func:callable,
          efunc_p:callable):
@@ -153,12 +147,12 @@ def ting(time:Iterable[float],
         t1s = np.zeros(len(time_ret))
         #TODO:　βの方と同じにしてもいいかも
         ret_integrate = bsp(top_t, time_ret, time_ret, indentation_dev_func, efunc)
-
         for i, t in enumerate(time_ret):
             try:
-                t1 = brentq(lambda t1:ret_integrate+bsp(t1,top_t,[t],indentation_dev_func,efunc),
+                t1 = brentq(lambda t1:ret_integrate[i]+bsp(t1,top_t,[t],indentation_dev_func,efunc)[0],
                     0,t1_pre)
             except Exception as e:
+                print(e)
                 break
                 
             t1s[i]+=t1
@@ -166,10 +160,14 @@ def ting(time:Iterable[float],
         return t1s
 
     efunc = lambda time:efunc_p(time,*properties_params)
-    t1s = _searching_t1(time[time>top_t], top_t, indentation_dev_func, efunc)
+    
+    t1s = _searching_t1(time[time>top_t], top_t,
+                        indentation_dev_func, efunc)
+    app_int = bsp(0, 
+                  time[time<=top_t], time[time<=top_t],
+                  indentation_23_dev_func, efunc)
 
-    app_int = bsp(0, time[time<=top_t], time[time<=top_t], indentation_23_dev_func, efunc)
-    ret_int = bsp(0, t1s,               t1s,               indentation_23_dev_func, efunc) 
+    ret_int = bsp(0, t1s, t1s, indentation_23_dev_func, efunc) 
 
     ting_curve=np.hstack([app_int,ret_int])
     return ting_curve

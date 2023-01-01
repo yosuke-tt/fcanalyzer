@@ -44,8 +44,10 @@ def bsp(start_t: float, end_t: float, time: Iterable[float],
         def _integral_inner(g):
             return ind_dev(g)*property_func(t_now-g)
         return integrate.quad(_integral_inner, start_t, end_t)[0]
-    return [  bsp_each_time(start_t, end_t, t_now, ind_dev, property_func) for t_now in time ]
-
+    if isinstance(end_t, float):
+        return [  bsp_each_time(start_t, end_t, t_now, ind_dev, property_func) for t_now in time ]
+    else:
+        return [  bsp_each_time(start_t, et, t_now, ind_dev, property_func) for t_now, et in zip(time, end_t) ]
 
 
 
@@ -55,16 +57,15 @@ def bsp(start_t: float, end_t: float, time: Iterable[float],
 ##
 ##############################################################################################################
 
-def _bsp_beta( t, k_exp, alpha, integral_range, t_dash = 1/50000):
+def _bsp_beta( t, k_exp, alpha, integral_range):
     beta_a = k_exp+1
     beta_b = 1-alpha
 
-    c_ = ((t+t_dash)**(k_exp-alpha+1))*(t_dash)**(alpha)
-    beta_end = integral_range[1]/(t+t_dash)
-    beta_start = integral_range[0]/(t+t_dash)
+    beta_end = integral_range[1]/(t)
+    beta_start = integral_range[0]/(t)
     beta_incomp = betainc(beta_a,beta_b,beta_end)-betainc(beta_a,beta_b,beta_start)
     c_beta = beta(beta_a, beta_b)*beta_incomp
-    return c_*c_beta
+    return c_beta
 
 
 ##関数コールするようにしてまとめた方がいいかも
@@ -74,13 +75,14 @@ def _beta_einf_bsp_beta(k,integral_range):
 def bsp_beta_e0(time:Iterable[float], 
                 integral_start, integral_end, 
                     e0, einf, alpha,
-                    k_exp, k_coeff):
+                    k_exp, k_coeff,t_dash = 1/50000):
     # e0を用いた重畳原理をβを用いて計算する（高速化のため）
 
 
     def _bsp_beta_e0(t, e0, einf, alpha, k_exp,k_coeff,integral_range):
-        bsp_res=_bsp_beta(t, k_exp, alpha,integral_range)
-        return k_coeff*(einf*_beta_einf_bsp_beta(k_exp,integral_range)+(e0-einf)*bsp_res) 
+        bsp_res=_bsp_beta(t+t_dash, k_exp, alpha,integral_range)
+        
+        return k_coeff*(einf*_beta_einf_bsp_beta(k_exp,integral_range)+(e0-einf)*((t+t_dash)**(k_exp-alpha+1))*(t_dash)**(alpha)*bsp_res) 
     bsp_beta = np.sum([_bsp_beta_e0(time,
                                e0, einf, alpha,
                                k_exp_, k_coeff_,
@@ -94,8 +96,8 @@ def bsp_beta_e1(time, integral_start, integral_end,
                     e1, einf, alpha,
                     k_exp, k_coeff):
     def _bsp_beta_e1(t, e1,einf,alpha,k_exp,k_coeff,integral_range, t_dash=1/50000):
-        bsp_beta_res=_bsp_beta(t, k_exp, alpha,integral_range)
-        return k_coeff*(einf*_beta_einf_bsp_beta(k_exp,integral_range)+(e1-einf)*((t_dash+t)**(1-alpha+k_coeff))*bsp_beta_res) 
+        bsp_beta_res=_bsp_beta(t+t_dash, k_exp, alpha,integral_range)
+        return k_coeff*(einf*_beta_einf_bsp_beta(k_exp,integral_range)+(e1-einf)*((t_dash+t)**(1-alpha+k_exp))*bsp_beta_res) 
     bsp_beta = np.sum([_bsp_beta_e1(time,
                                e1, einf, alpha,
                                k_exp_, k_coeff_,
